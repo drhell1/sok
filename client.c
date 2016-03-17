@@ -28,10 +28,8 @@ void *Server_t_new(void *sok_data)
 {
 	Server_t *serv = malloc(sizeof(Server_t));
 	serv->sok_data = sok_data;
-	printf("%d\n",*(int*)serv->sok_data);
 	serv->call = Server_new(sendfunc, serv->sok_data);
-	printf("point addr in new %d\n",serv);
-	return (void*)serv;
+	return (void*)serv->call;
 }
 
 void Server_t_free(void *ptr)
@@ -43,10 +41,7 @@ void Server_t_free(void *ptr)
 void Server_t_request(void *ptr)
 {
 	Server *serv = ptr;
-	printf("point addr in request %d\n",ptr);
-	puts("In server_t_request\n");
 	serv->get_time(serv);
-	puts("In server_t_request after time\n");
 }
 
 int main(int argc, char **argv)
