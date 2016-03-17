@@ -36,6 +36,15 @@ struct SOK_Server_Client
 	void(*destroy_callback)(void*);
 };
 
+struct SOK_Client
+{
+	int sockfd;
+	void*(*cli_init)(void*);
+	void(*cli_receive_callback)(void*,char*);
+	void(*cli_request_callback)(void*);
+	void(*cli_destroy)(void*);
+};
+
 struct SOK_Server
 {
 	int sockfd;
@@ -43,6 +52,8 @@ struct SOK_Server
 	void(*cli_receive_callback)(void*,char*);
 	void(*cli_destroy)(void*);
 };
+
+/* Client */
 
 static inline int SOK_Client_init(char *addr, int port)
 {
@@ -60,6 +71,60 @@ static inline int SOK_Client_init(char *addr, int port)
 	}
 	return sockfd;
 }
+
+#include <stdio.h>
+static inline void SOK_Client_main(struct SOK_Client *client)
+{
+	int n;
+	char buffer[BUFFER_SIZE];
+	void *ptr = client->cli_init(&client->sockfd);
+	printf("point addr in sok_main %d\n",ptr);
+	puts("sok_client_main after cli_init\n");
+	while(1)
+	{
+		puts("before cli_request");
+		client->cli_request_callback(ptr);
+		puts("after cli_request");
+		memset(buffer, 0, BUFFER_SIZE);
+		n = read(client->sockfd, buffer, BUFFER_SIZE);
+		printf("%d value of n\n",n);
+		if (n < 0)
+		{
+			/* perror("Cannot read from socket!\n"); */
+			break;
+		}
+		else if (n == 0)
+		{
+			/* puts("Disconnected from server most likely"); */
+			break;
+		}
+		client->cli_receive_callback(NULL, buffer);
+	}
+	client->cli_destroy(client);
+}
+
+static inline void SOK_Client_destroy(struct SOK_Client *client)
+{
+	close(client->sockfd);
+	free(client);
+}
+
+static inline void SOK_Client(char *addr, int port, void*(*cli_init)(void*),
+		void(*cli_request_callback)(void*),
+		void(*cli_receive_callback)(void*,char*), void(*cli_destroy)(void*))
+{
+	struct SOK_Client *client = malloc(sizeof(struct SOK_Client));
+	client->sockfd = SOK_Client_init(addr, port);
+	/* TODO: treat error */
+	client->cli_init = cli_init;
+	client->cli_request_callback = cli_request_callback;
+	client->cli_receive_callback = cli_receive_callback;
+	client->cli_destroy = cli_destroy;
+	SOK_Client_main(client);
+	SOK_Client_destroy(client);
+}
+
+/* Server */
 
 static inline int SOK_Server_init(int port)
 {

@@ -5,6 +5,12 @@
 
 SERVER(Server, REMOTE_FUNC(get_time));
 
+typedef struct
+{
+	Server *call;
+	void *sok_data;
+} Server_t;
+
 void print_time(void *data, int hour, int min, int sec )
 {
 	printf("\b\b\b\b\b\b\b\b%.2d:%.2d:%.2d", hour, min, sec);
@@ -18,32 +24,34 @@ void sendfunc(void *data, char *buffer)
 
 HOST(SHARED_FUNC(print_time, int, int, int));
 
+void *Server_t_new(void *sok_data)
+{
+	Server_t *serv = malloc(sizeof(Server_t));
+	serv->sok_data = sok_data;
+	printf("%d\n",*(int*)serv->sok_data);
+	serv->call = Server_new(sendfunc, serv->sok_data);
+	printf("point addr in new %d\n",serv);
+	return (void*)serv;
+}
+
+void Server_t_free(void *ptr)
+{
+	Server_t *this = ptr;
+	Server_free(this->call);
+}
+
+void Server_t_request(void *ptr)
+{
+	Server *serv = ptr;
+	printf("point addr in request %d\n",ptr);
+	puts("In server_t_request\n");
+	serv->get_time(serv);
+	puts("In server_t_request after time\n");
+}
+
 int main(int argc, char **argv)
 {
-	int n;
-	char buffer[256];
-	int sockfd = SOK_Client_init("127.0.0.1", 5001);
-
-	Server *serv = Server_new(sendfunc, &sockfd);
-	while(1)
-	{
-		serv->get_time(serv);
-		memset(buffer, 0, 256);
-		n = read(sockfd, buffer, 256);
-		if (n < 0)
-		{
-			perror("Cannot read from socket!\n");
-			break;
-		}
-		else if (n == 0)
-		{
-			puts("Disconnected from server most like");
-			break;
-		}
-		RFI_called(NULL, buffer);
-	}
-
-	Server_free(serv);
-	close(sockfd);
+	SOK_Client("127.0.0.1", 5001, Server_t_new, Server_t_request, RFI_called,
+			Server_t_free);
 	return 0;
 }
