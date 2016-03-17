@@ -13,7 +13,6 @@ typedef struct
 
 void get_time(Client *cli)
 {
-	puts("Im get_time\n");
 	time_t epoch_time = time(NULL);
 	struct tm *tm_p = localtime(&epoch_time);
 	cli->call->print_time(cli->call, tm_p->tm_hour, tm_p->tm_min, tm_p->tm_sec);
