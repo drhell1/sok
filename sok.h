@@ -132,7 +132,8 @@ static inline void SOK_Server_main(struct SOK_Server *serv)
 			/* TODO: add error */
 			continue;
 		}
-		struct SOK_Server_Client *client = malloc(sizeof(typeof(client)));
+		struct SOK_Server_Client *client = malloc(sizeof(struct
+					SOK_Server_Client));
 
 		client->data = serv->cli_init(client);
 		client->sockfd = cli_socket;
