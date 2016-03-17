@@ -10,6 +10,11 @@
 #include <stdlib.h>
 #include <string.h>
 
+enum SOK_ERROR
+{
+	EINIT=-1
+};
+
 #ifndef BUFFER_SIZE
 	#define BUFFER_SIZE 256
 #endif
@@ -51,8 +56,7 @@ static inline int SOK_Client_init(char *addr, int port)
 	serv_addr.sin_port = htons(port);
 	if(connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
 	{
-		/* TODO: add error */
-		exit(1);
+		return EINIT;
 	}
 	return sockfd;
 }
@@ -67,8 +71,7 @@ static inline int SOK_Server_init(int port)
 	int sockfd = socket(CONN_TYPE, SOCKET_TYPE, 0);
 	if(bind(sockfd, (struct sockaddr*)&addr, sizeof(typeof(addr))) < 0)
 	{
-		/* TODO: add error */
-		exit(1);
+		return EINIT;
 	}
 	return sockfd;
 }
@@ -77,6 +80,12 @@ static void SOK_Server_send(void* data, char* buffer)
 {
 	struct SOK_Server_Client *cli = data;
 	write(cli->sockfd, buffer, BUFFER_SIZE);
+}
+
+static inline void SOK_Server_destroy(struct SOK_Server *serv)
+{
+	close(serv->sockfd);
+	free(serv);
 }
 
 static void * SOK_Server_client_thread(void *data)
@@ -144,12 +153,6 @@ static inline void SOK_Server_main(struct SOK_Server *serv)
 			/* TODO: add error */
 		}
 	}
-}
-
-static inline void SOK_Server_destroy(struct SOK_Server *serv)
-{
-	close(serv->sockfd);
-	free(serv);
 }
 
 static inline void SOK_Server(int port, void*(*cli_init)(void*),
