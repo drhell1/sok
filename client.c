@@ -13,9 +13,7 @@ void print_time(void *data, int hour, int min, int sec )
 
 void sendfunc(void *data, char *buffer)
 {
-	printf("Sending\n");
 	write(*(int*)data, buffer, 256);
-	printf("sent\n");
 }
 
 HOST(SHARED_FUNC(print_time, int, int, int));
