@@ -10,13 +10,9 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef ERROR_NUM
-	#define ERROR_NUM 1
+#ifndef BUFFER_SIZE
+	#define BUFFER_SIZE 256
 #endif
-
-/* #ifndef BUFFER_SIZE */
-/* 	#define BUFFER_SIZE 256 */
-/* #endif */
 
 #ifndef SOCKET_TYPE
 	#define SOCKET_TYPE SOCK_STREAM
@@ -43,7 +39,6 @@ struct SOK_Server
 	void(*cli_destroy)(void*);
 };
 
-#include<stdio.h>
 static inline int SOK_Client_init(char *addr, int port)
 {
 	struct sockaddr_in serv_addr = {0};
@@ -57,7 +52,7 @@ static inline int SOK_Client_init(char *addr, int port)
 	if(connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
 	{
 		/* TODO: add error */
-		exit(ERROR_NUM);
+		exit(1);
 	}
 	return sockfd;
 }
@@ -81,17 +76,17 @@ static inline int SOK_Server_init(int port)
 static void SOK_Server_send(void* data, char* buffer)
 {
 	struct SOK_Server_Client *cli = data;
-	write(cli->sockfd, buffer, 256);
+	write(cli->sockfd, buffer, BUFFER_SIZE);
 }
 
 static void * SOK_Server_client_thread(void *data)
 {
 	struct SOK_Server_Client *cli = data;
-	char buffer[256];
+	char buffer[BUFFER_SIZE];
 	while(1)
 	{
-		memset(buffer, 0, 256);
-		int n = read(cli->sockfd, buffer, 256);
+		memset(buffer, 0, BUFFER_SIZE);
+		int n = read(cli->sockfd, buffer, BUFFER_SIZE);
 		if (n < 0)
 		{
 			/* TODO: add error */
@@ -119,7 +114,7 @@ static void * SOK_Server_client_thread(void *data)
 
 static inline void SOK_Server_main(struct SOK_Server *serv)
 {
-	char buffer[256];
+	char buffer[BUFFER_SIZE];
 	while(1)
 	{
 		listen(serv->sockfd, 5);
