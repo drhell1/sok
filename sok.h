@@ -19,59 +19,29 @@ enum SOK_ERROR
 	#define BUFFER_SIZE 256
 #endif
 
-struct SOK_Server_Client
-{
-	int sockfd;
-	pthread_t thr;
-	void *data;
-	void(*receive_callback)(void*,char*);
-	void(*destroy_callback)(void*);
-};
-
-struct SOK_Client
-{
-	int sockfd;
-	void*(*cli_init)(void*);
-	void(*cli_receive_callback)(void*,char*);
-	void(*cli_request_callback)(void*);
-	void(*cli_destroy)(void*);
-};
-
-struct SOK_Server
-{
-	int sockfd;
-	void*(*cli_init)(void*);
-	void(*cli_receive_callback)(void*,char*);
-	void(*cli_destroy)(void*);
-};
-
 /* Client */
 
-static inline int SOK_Client_init(char *addr, int port)
+typedef struct
 {
-	struct sockaddr_in serv_addr = {0};
-	struct hostent *host;
-	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	host = gethostbyname(addr);
-	serv_addr.sin_family = AF_INET;
-	memcpy((char*)&serv_addr.sin_addr.s_addr, (char*)host->h_addr,
-			host->h_length);
-	serv_addr.sin_port = htons(port);
-	if(connect(sockfd, (struct sockaddr*)&serv_addr, sizeof(serv_addr)) < 0)
-	{
-		return EINIT;
-	}
-	return sockfd;
+	int sockfd;
+	pthread_t listen_thread;
+	void(*cli_receive_callback)(void*,char*);
+	void *data;
+} SOK_Client;
+
+void SOK_Client_send(void *data, char *buffer)
+{
+	SOK_Client *client = (SOK_Client*)data;
+	write(client->sockfd, buffer, BUFFER_SIZE);
 }
 
-static inline void SOK_Client_main(struct SOK_Client *client)
+void *SOK_Client_main(void *data)
 {
+	SOK_Client *client = (SOK_Client*)data;
 	int n;
 	char buffer[BUFFER_SIZE];
-	void *ptr = client->cli_init(&client->sockfd);
 	while(1)
 	{
-		client->cli_request_callback(ptr);
 		memset(buffer, 0, BUFFER_SIZE);
 		n = read(client->sockfd, buffer, BUFFER_SIZE);
 		if (n < 0)
@@ -84,33 +54,77 @@ static inline void SOK_Client_main(struct SOK_Client *client)
 			/* TODO: add msg disconnected from server */
 			break;
 		}
-		client->cli_receive_callback(NULL, buffer);
+		client->cli_receive_callback(client->data, buffer);
 	}
-	client->cli_destroy(client);
+	return NULL;
 }
 
-static inline void SOK_Client_destroy(struct SOK_Client *client)
+static inline void SOK_Client_destroy(SOK_Client *client)
 {
 	close(client->sockfd);
 	free(client);
 }
 
-static inline void SOK_Client(char *addr, int port, void*(*cli_init)(void*),
-		void(*cli_request_callback)(void*),
-		void(*cli_receive_callback)(void*,char*), void(*cli_destroy)(void*))
+static inline SOK_Client *SOK_Client_init(char *addr, int port,
+		void(*cli_receive_callback)(void*,char*), void *data)
 {
-	struct SOK_Client *client = malloc(sizeof(struct SOK_Client));
-	client->sockfd = SOK_Client_init(addr, port);
-	/* TODO: treat error */
-	client->cli_init = cli_init;
-	client->cli_request_callback = cli_request_callback;
+	SOK_Client *client = malloc(sizeof(SOK_Client));
+
 	client->cli_receive_callback = cli_receive_callback;
-	client->cli_destroy = cli_destroy;
-	SOK_Client_main(client);
-	SOK_Client_destroy(client);
+	client->data = data;
+
+	/* Connecting to server */
+
+	struct sockaddr_in serv_addr = {0};
+	struct hostent *host;
+	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
+	host = gethostbyname(addr);
+	serv_addr.sin_family = AF_INET;
+	memcpy((char*)&serv_addr.sin_addr.s_addr, (char*)host->h_addr,
+			host->h_length);
+	serv_addr.sin_port = htons(port);
+	if(connect(sockfd, (struct sockaddr*)&serv_addr,
+				sizeof(serv_addr)) < 0)
+	{
+		return NULL;
+	}
+	client->sockfd = sockfd;
+
+	/* -------------------- */
+
+
+	/* Starting listen loop thread */
+	pthread_attr_t thr_attr;
+	pthread_attr_init(&thr_attr);
+	pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_DETACHED);
+	if(pthread_create(&client->listen_thread, &thr_attr, SOK_Client_main,
+			(void*)client))
+	{
+		/* TODO: add error */
+	}
+	/* ---------------------------- */
+
+	return client;
 }
 
 /* Server */
+
+struct SOK_Server_Client
+{
+	int sockfd;
+	pthread_t thr;
+	void *data;
+	void(*receive_callback)(void*,char*);
+	void(*destroy_callback)(void*);
+};
+
+struct SOK_Server
+{
+	int sockfd;
+	void*(*cli_init)(void*);
+	void(*cli_receive_callback)(void*,char*);
+	void(*cli_destroy)(void*);
+};
 
 static inline int SOK_Server_init(int port)
 {

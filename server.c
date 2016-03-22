@@ -3,7 +3,7 @@
 #include "rfi.h"
 #include "sok.h"
 
-SERVER(R_Client, REMOTE_FUNC(print_time, int, int, int));
+REMOTE(R_Client, REMOTE_FUNC(print_time, int, int, int));
 
 typedef struct
 {

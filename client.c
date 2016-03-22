@@ -1,15 +1,10 @@
 #include <time.h>
+#include <assert.h>
 #include "sok.h"
 #include "rfi.h"
 #include <stdio.h>
 
-SERVER(Server, REMOTE_FUNC(get_time));
-
-typedef struct
-{
-	Server *call;
-	void *sok_data;
-} Server_t;
+REMOTE(Server, REMOTE_FUNC(get_time));
 
 void print_time(void *data, int hour, int min, int sec )
 {
@@ -17,36 +12,27 @@ void print_time(void *data, int hour, int min, int sec )
 	fflush(stdout);
 }
 
-void sendfunc(void *data, char *buffer)
-{
-	write(*(int*)data, buffer, 256);
-}
-
 HOST(SHARED_FUNC(print_time, int, int, int));
 
-void *Server_t_new(void *sok_data)
+void on_receive(void *data, char *buffer)
 {
-	Server_t *serv = malloc(sizeof(Server_t));
-	serv->sok_data = sok_data;
-	serv->call = Server_new(sendfunc, serv->sok_data);
-	return (void*)serv->call;
-}
-
-void Server_t_free(void *ptr)
-{
-	Server_t *this = ptr;
-	Server_free(this->call);
-}
-
-void Server_t_request(void *ptr)
-{
-	Server *serv = ptr;
+	Server *serv = (Server*)data;
+	RFI_called(serv, buffer);
 	serv->get_time(serv);
 }
 
 int main(int argc, char **argv)
 {
-	SOK_Client("127.0.0.1", 5001, Server_t_new, Server_t_request, RFI_called,
-			Server_t_free);
+	Server *serv = Server_new(SOK_Client_send, NULL);
+	SOK_Client *sok_client = SOK_Client_init("127.0.0.1", 5001, on_receive, serv);
+	assert(sok_client);
+
+	serv->send_data = sok_client;
+	serv->get_time(serv);
+
+	while(1);
+
+	SOK_Client_destroy(sok_client);
+	Server_free(serv);
 	return 0;
 }
