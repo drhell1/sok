@@ -65,7 +65,7 @@ static inline void SOK_Client_destroy(SOK_Client *client)
 	free(client);
 }
 
-static inline SOK_Client *SOK_Client_init(char *addr, int port,
+static inline SOK_Client *SOK_Client_new(char *addr, int port,
 		void(*cli_receive_callback)(void*,char*), void *data)
 {
 	SOK_Client *client = malloc(sizeof(SOK_Client));
@@ -118,15 +118,21 @@ struct SOK_Server_Client
 	void(*destroy_callback)(void*);
 };
 
-struct SOK_Server
+typedef struct
 {
 	int sockfd;
+
+	/* Client Construction info */
 	void*(*cli_init)(void*);
 	void(*cli_receive_callback)(void*,char*);
 	void(*cli_destroy)(void*);
-};
+	/* ------------------------ */
 
-static inline int SOK_Server_init(int port)
+	struct SOK_Server_Client *clients;
+	unsigned int clients_num;
+} SOK_Server;
+
+static inline int SOK_Server_bind(int port)
 {
 	struct sockaddr_in addr;
 	memset((char *)&addr, 0, sizeof(struct sockaddr_in));
@@ -147,10 +153,39 @@ static void SOK_Server_send(void* data, char* buffer)
 	write(serv_cli->sockfd, buffer, BUFFER_SIZE);
 }
 
-static inline void SOK_Server_destroy(struct SOK_Server *serv)
+static inline SOK_Server_Client_join(struct SOK_Server_Client *this)
 {
-	close(serv->sockfd);
-	free(serv);
+	pthread_join(this->thr, NULL);
+}
+
+static inline SOK_Server_Client_disconnect(struct SOK_Server_Client *this)
+{
+	close(this->sockfd);
+}
+
+void SOK_Server_Client_destroy(struct SOK_Server_Client *this)
+{
+	close(this->sockfd);
+	if(this->destroy_callback)
+	{
+		this->destroy_callback(this->data);
+	}
+	free(this);
+}
+
+static inline void SOK_Server_destroy(SOK_Server *this)
+{
+	int i;
+	for(i = 0; i < this->clients_num; i++)
+	{
+		struct SOK_Server_Client *client = &this->clients[i];
+
+		SOK_Server_Client_disconnect(client);
+		SOK_Server_Client_join(client);
+		SOK_Server_Client_destroy(client);
+	}
+	close(this->sockfd);
+	free(this);
 }
 
 static void * SOK_Server_client_thread(void *data)
@@ -164,29 +199,19 @@ static void * SOK_Server_client_thread(void *data)
 		if (n < 0)
 		{
 			/* TODO: add error */
-			close(serv_cli->sockfd);
-			if(serv_cli->destroy_callback)
-			{
-				serv_cli->destroy_callback(serv_cli);
-			}
-			free(serv_cli);
+			SOK_Server_Client_destroy(serv_cli);
 			return NULL;
 		}
 		else if (n == 0)
 		{
-			close(serv_cli->sockfd);
-			if(serv_cli->destroy_callback)
-			{
-				serv_cli->destroy_callback(serv_cli);
-			}
-			free(serv_cli);
+			SOK_Server_Client_destroy(serv_cli);
 			return NULL;
 		}
 		serv_cli->receive_callback(serv_cli->data, buffer);
 	}
 }
 
-static inline void SOK_Server_main(struct SOK_Server *serv)
+static inline void SOK_Server_start(SOK_Server *serv)
 {
 	char buffer[BUFFER_SIZE];
 	while(1)
@@ -220,16 +245,18 @@ static inline void SOK_Server_main(struct SOK_Server *serv)
 	}
 }
 
-static inline void SOK_Server(int port, void*(*cli_init)(void*),
+static inline SOK_Server *SOK_Server_new(int port, void*(*cli_init)(void*),
 		void(*cli_receive_callback)(void*,char*), void(*cli_destroy)(void*))
 {
-	struct SOK_Server *serv = malloc(sizeof(struct SOK_Server));
-	serv->sockfd = SOK_Server_init(port);
-	serv->cli_init = cli_init;
-	serv->cli_receive_callback = cli_receive_callback;
-	serv->cli_destroy = cli_destroy;
-	SOK_Server_main(serv);
-	SOK_Server_destroy(serv);
+	SOK_Server *this = malloc(sizeof(SOK_Server));
+	this->clients = NULL; this->clients_num = 0;
+	this->sockfd = SOK_Server_bind(port);
+
+	this->cli_init = cli_init;
+	this->cli_receive_callback = cli_receive_callback;
+	this->cli_destroy = cli_destroy;
+
+	return this;
 }
 
 #endif /* SOCK_H */
