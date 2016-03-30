@@ -147,7 +147,7 @@ static inline int SOK_Server_bind(int port)
 	return sockfd;
 }
 
-static void SOK_Server_send(void* data, char* buffer)
+void SOK_Server_Client_send(void *data, char *buffer)
 {
 	struct SOK_Server_Client *serv_cli = data;
 	write(serv_cli->sockfd, buffer, BUFFER_SIZE);
@@ -186,6 +186,20 @@ static inline void SOK_Server_destroy(SOK_Server *this)
 	}
 	close(this->sockfd);
 	free(this);
+}
+
+void SOK_Server_broadcast(SOK_Server *this, char *message,
+		struct SOK_Server_Client *except)
+{
+	int i;
+	for(i = 0; i < this->clients_num; i++)
+	{
+		struct SOK_Server_Client *client = &this->clients[i];
+		if(client != except)
+		{
+			SOK_Server_Client_send(client, message);
+		}
+	}
 }
 
 static void * SOK_Server_client_thread(void *data)
