@@ -23,7 +23,10 @@ enum SOK_ERROR
 
 typedef struct
 {
+	char *addr;
+	int port;
 	int sockfd;
+
 	pthread_t listen_thread;
 	void(*cli_receive_callback)(void*,char*);
 	void *data;
@@ -68,43 +71,56 @@ static inline void SOK_Client_destroy(SOK_Client *client)
 static inline SOK_Client *SOK_Client_new(char *addr, int port,
 		void(*cli_receive_callback)(void*,char*), void *data)
 {
-	SOK_Client *client = malloc(sizeof(SOK_Client));
+	SOK_Client *this = malloc(sizeof(SOK_Client));
 
-	client->cli_receive_callback = cli_receive_callback;
-	client->data = data;
+	this->cli_receive_callback = cli_receive_callback;
+	this->data = data;
 
+	this->addr = addr;
+	this->port = port;
+
+	return this;
+}
+
+static int SOK_Client_connect(SOK_Client *this)
+{
 	/* Connecting to server */
 
 	struct sockaddr_in serv_addr = {0};
 	struct hostent *host;
 	int sockfd = socket(AF_INET, SOCK_STREAM, 0);
-	host = gethostbyname(addr);
+	host = gethostbyname(this->addr);
 	serv_addr.sin_family = AF_INET;
 	memcpy((char*)&serv_addr.sin_addr.s_addr, (char*)host->h_addr,
 			host->h_length);
-	serv_addr.sin_port = htons(port);
+	serv_addr.sin_port = htons(this->port);
 	if(connect(sockfd, (struct sockaddr*)&serv_addr,
 				sizeof(serv_addr)) < 0)
 	{
-		return NULL;
+		return 0;
 	}
-	client->sockfd = sockfd;
+	this->sockfd = sockfd;
 
 	/* -------------------- */
-
 
 	/* Starting listen loop thread */
 	pthread_attr_t thr_attr;
 	pthread_attr_init(&thr_attr);
 	pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_DETACHED);
-	if(pthread_create(&client->listen_thread, &thr_attr, SOK_Client_main,
-			(void*)client))
+	if(pthread_create(&this->listen_thread, &thr_attr, SOK_Client_main,
+			(void*)this))
 	{
 		/* TODO: add error */
+		return 0;
 	}
 	/* ---------------------------- */
 
-	return client;
+	return 1;
+}
+
+void SOK_Client_set_send_data(SOK_Client *this, void *data)
+{
+	this->data = data;
 }
 
 /* Server */
