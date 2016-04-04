@@ -9,7 +9,6 @@
 /* Client Side */
 /***************/
 
-struct SOK_Client;
 typedef struct SOK_Client SOK_Client;
 
 /**
@@ -42,7 +41,6 @@ void SOK_Client_destroy(SOK_Client*);
 /***************/
 
 struct SSOK_Client;
-struct SSOK_Server;
 typedef struct SSOK_Server SSOK_Server;
 
 /**
