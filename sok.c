@@ -118,6 +118,11 @@ void SOK_Client_set_send_data(SOK_Client *this, void *data)
 	this->data = data;
 }
 
+void SOK_Client_wait(SOK_Client *this)
+{
+	pthread_join(this->listen_thread, NULL);
+}
+
 /* Server */
 
 struct SSOK_Client;

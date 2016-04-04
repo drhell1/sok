@@ -36,6 +36,11 @@ void SOK_Client_send(void *, char *);
  */
 void SOK_Client_destroy(SOK_Client*);
 
+/**
+ *
+ */
+void SOK_Client_wait(SOK_Client *);
+
 /***************/
 /* Server Side */
 /***************/
