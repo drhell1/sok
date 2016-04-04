@@ -68,7 +68,7 @@ static inline void SOK_Client_destroy(SOK_Client *client)
 	free(client);
 }
 
-static inline SOK_Client *SOK_Client_new(char *addr, int port,
+SOK_Client *SOK_Client_new(char *addr, int port,
 		void(*cli_receive_callback)(void*,char*), void *data)
 {
 	SOK_Client *this = malloc(sizeof(SOK_Client));
