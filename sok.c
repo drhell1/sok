@@ -99,10 +99,7 @@ int SOK_Client_connect(SOK_Client *this)
 	/* -------------------- */
 
 	/* Starting listen loop thread */
-	pthread_attr_t thr_attr;
-	pthread_attr_init(&thr_attr);
-	pthread_attr_setdetachstate(&thr_attr, PTHREAD_CREATE_DETACHED);
-	if(pthread_create(&this->listen_thread, &thr_attr, SOK_Client_main,
+	if(pthread_create(&this->listen_thread, NULL, SOK_Client_main,
 			(void*)this))
 	{
 		/* TODO: add error */
