@@ -1,5 +1,6 @@
 #ifndef SOCK_H
 #define SOCK_H
+#include <stddef.h>
 
 /***************/
 /* Client Side */
@@ -62,7 +63,7 @@ void SSOK_Server_run(SSOK_Server *);
 /**
  *
  */
-void SSOK_Server_broadcast(SSOK_Server*, char*, struct SSOK_Client*);
+void SSOK_Server_broadcast(SSOK_Server*, char*, size_t, struct SSOK_Client*);
 
 /**
 *

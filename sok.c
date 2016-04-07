@@ -8,6 +8,7 @@
 #include <netdb.h>
 #include <stdlib.h>
 #include <string.h>
+#include <alloca.h>
 
 /* Client */
 
@@ -246,7 +247,7 @@ void SSOK_Server_destroy(SSOK_Server *this)
 	free(this);
 }
 
-void SSOK_Server_broadcast(SSOK_Server *this, char *message,
+void SSOK_Server_broadcast(SSOK_Server *this, char *message, size_t len,
 		struct SSOK_Client *except)
 {
 	int i;
@@ -255,7 +256,7 @@ void SSOK_Server_broadcast(SSOK_Server *this, char *message,
 		struct SSOK_Client *client = this->clients[i];
 		if(client != except)
 		{
-			SSOK_Client_send(client, message);
+			SSOK_Client_send(client, message, len);
 		}
 	}
 }
