@@ -1,10 +1,6 @@
 #ifndef SOCK_H
 #define SOCK_H
 
-#ifndef SOK_BUFFER_SIZE
-	#define SOK_BUFFER_SIZE 256
-#endif
-
 /***************/
 /* Client Side */
 /***************/
@@ -29,7 +25,7 @@ void SOK_Client_set_send_data(SOK_Client*, void *);
 /**
  *
  */
-void SOK_Client_send(void *, char *);
+void SOK_Client_send(void *, char *, size_t);
 
 /**
  *
@@ -77,7 +73,7 @@ struct SSOK_Client * SSOK_Client_new(int , void*(*)(void*),
 /**
  *
  */
-void SSOK_Client_send(void *data, char *buffer);
+void SSOK_Client_send(void *, char *, size_t);
 
 /**
  *

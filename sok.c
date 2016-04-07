@@ -27,33 +27,39 @@ typedef struct SOK_Client
 	void *data;
 } SOK_Client;
 
-void SOK_Client_send(void *data, char *buffer)
+void SOK_Client_send(void *data, char *buffer, size_t len)
 {
 	SOK_Client *client = (SOK_Client*)data;
-	write(client->sockfd, buffer, SOK_BUFFER_SIZE);
+	write(client->sockfd, &len, sizeof(size_t));
+	write(client->sockfd, buffer, len);
+}
+
+static inline int SOK_Client_receive(SOK_Client *this)
+{
+	int n;
+	size_t len;
+	n = read(this->sockfd, &len, sizeof(size_t));
+	if (n < 0)
+	{
+		/* TODO: add error cannot read from socket */
+		return 0;
+	}
+	else if (n == 0)
+	{
+		/* TODO: add msg disconnected from server */
+		return 0;
+	}
+	char *buffer = alloca(len);
+	n = read(this->sockfd, buffer, len);
+	/* TODO: add verification */
+	this->cli_receive_callback(this->data, buffer);
+	return 1;
 }
 
 static void * SOK_Client_main(void *data)
 {
 	SOK_Client *client = (SOK_Client*)data;
-	int n;
-	char buffer[SOK_BUFFER_SIZE];
-	while(1)
-	{
-		memset(buffer, 0, SOK_BUFFER_SIZE);
-		n = read(client->sockfd, buffer, SOK_BUFFER_SIZE);
-		if (n < 0)
-		{
-			/* TODO: add error cannot read from socket */
-			break;
-		}
-		else if (n == 0)
-		{
-			/* TODO: add msg disconnected from server */
-			break;
-		}
-		client->cli_receive_callback(client->data, buffer);
-	}
+	while(SOK_Client_receive(client));
 	return NULL;
 }
 
@@ -192,10 +198,11 @@ static inline int SSOK_Server_bind(int port)
 	return sockfd;
 }
 
-void SSOK_Client_send(void *data, char *buffer)
+void SSOK_Client_send(void *data, char *buffer, size_t len)
 {
 	struct SSOK_Client *serv_cli = data;
-	write(serv_cli->sockfd, buffer, SOK_BUFFER_SIZE);
+	write(serv_cli->sockfd, &len, sizeof(size_t));
+	write(serv_cli->sockfd, buffer, len);
 }
 
 static inline void SSOK_Client_join(struct SSOK_Client *this)
@@ -258,27 +265,33 @@ void * SSOK_Client_get_server_data(const struct SSOK_Client *this)
 	return this->server;
 }
 
+static inline int SSOK_Client_receive(struct SSOK_Client *this)
+{
+	int n;
+	size_t len;
+	n = read(this->sockfd, &len, sizeof(size_t));
+	if (n < 0)
+	{
+		/* TODO: add error */
+		SSOK_Client_destroy(this);
+		return 0;
+	}
+	else if (n == 0)
+	{
+		SSOK_Client_destroy(this);
+		return 0;
+	}
+	char *buffer = alloca(len);
+	n = read(this->sockfd, buffer, len);
+	/* TODO: add verification */
+	this->receive_callback(this->data, buffer);
+	return 1;
+}
+
 static void * SSOK_client_thread(void *data)
 {
 	struct SSOK_Client *serv_cli = data;
-	char buffer[SOK_BUFFER_SIZE];
-	while(1)
-	{
-		memset(buffer, 0, SOK_BUFFER_SIZE);
-		int n = read(serv_cli->sockfd, buffer, SOK_BUFFER_SIZE);
-		if (n < 0)
-		{
-			/* TODO: add error */
-			SSOK_Client_destroy(serv_cli);
-			return NULL;
-		}
-		else if (n == 0)
-		{
-			SSOK_Client_destroy(serv_cli);
-			return NULL;
-		}
-		serv_cli->receive_callback(serv_cli->data, buffer);
-	}
+	while(SSOK_Client_receive(serv_cli));
 }
 
 struct SSOK_Client * SSOK_Client_new(int cli_socket, void*(*cli_init)(void*),
