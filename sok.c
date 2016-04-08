@@ -24,7 +24,7 @@ typedef struct SOK_Client
 	int sockfd;
 
 	pthread_t listen_thread;
-	void(*cli_receive_callback)(void*,char*);
+	void(*cli_receive_callback)(void*,char*,size_t);
 	void *data;
 } SOK_Client;
 
@@ -53,7 +53,7 @@ static inline int SOK_Client_receive(SOK_Client *this)
 	char *buffer = alloca(len);
 	n = read(this->sockfd, buffer, len);
 	/* TODO: add verification */
-	this->cli_receive_callback(this->data, buffer);
+	this->cli_receive_callback(this->data, buffer, len);
 	return 1;
 }
 
@@ -71,7 +71,7 @@ void SOK_Client_destroy(SOK_Client *client)
 }
 
 SOK_Client * SOK_Client_new(char *addr, int port,
-		void(*cli_receive_callback)(void*,char*), void *data)
+		void(*cli_receive_callback)(void*,char*,size_t), void *data)
 {
 	SOK_Client *this = malloc(sizeof(SOK_Client));
 
@@ -137,7 +137,7 @@ typedef struct SSOK_Server
 
 	/* Client Construction info */
 	void*(*cli_init)(void*);
-	void(*cli_receive_callback)(void*,char*);
+	void(*cli_receive_callback)(void*,char*,size_t);
 	void(*cli_destroy)(void*);
 	/* ------------------------ */
 
@@ -152,7 +152,7 @@ struct SSOK_Client
 	int sockfd;
 	pthread_t thr;
 	void *data;
-	void(*receive_callback)(void*,char*);
+	void(*receive_callback)(void*,char*,size_t);
 	void(*destroy_callback)(void*);
 	SSOK_Server *server;
 };
@@ -285,7 +285,7 @@ static inline int SSOK_Client_receive(struct SSOK_Client *this)
 	char *buffer = alloca(len);
 	n = read(this->sockfd, buffer, len);
 	/* TODO: add verification */
-	this->receive_callback(this->data, buffer);
+	this->receive_callback(this->data, buffer, len);
 	return 1;
 }
 
@@ -296,7 +296,8 @@ static void * SSOK_client_thread(void *data)
 }
 
 struct SSOK_Client * SSOK_Client_new(int cli_socket, void*(*cli_init)(void*),
-		void(*cli_receive_callback)(void*,char*), void(*cli_destroy)(void*))
+		void(*cli_receive_callback)(void*,char*,size_t),
+		void(*cli_destroy)(void*))
 {
 	struct SSOK_Client *this = malloc(sizeof(*this));
 	this->sockfd = cli_socket;
@@ -338,7 +339,7 @@ void SSOK_Server_run(SSOK_Server *this)
 }
 
 SSOK_Server * SSOK_Server_new(int port, void*(*cli_init)(void*),
-		void(*cli_receive_callback)(void*,char*), void(*cli_destroy)(void*))
+		void(*cli_receive_callback)(void*,char*,size_t), void(*cli_destroy)(void*))
 {
 	SSOK_Server *this = malloc(sizeof(SSOK_Server));
 	this->clients = NULL; this->clients_num = 0;

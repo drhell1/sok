@@ -11,7 +11,7 @@ typedef struct SOK_Client SOK_Client;
 /**
  *
  */
-SOK_Client * SOK_Client_new(char*, int, void(*)(void*,char*), void*);
+SOK_Client * SOK_Client_new(char*, int, void(*)(void*,char*,size_t), void*);
 
 /**
  *
@@ -48,7 +48,7 @@ typedef struct SSOK_Server SSOK_Server;
 /**
  *
  */
-SSOK_Server * SSOK_Server_new(int, void*(*)(void*), void(*)(void*,char*),
+SSOK_Server * SSOK_Server_new(int, void*(*)(void*), void(*)(void*,char*, size_t),
 		void(*)(void*));
 /**
  *
@@ -69,7 +69,7 @@ void SSOK_Server_broadcast(SSOK_Server*, char*, size_t, struct SSOK_Client*);
 *
 */
 struct SSOK_Client * SSOK_Client_new(int , void*(*)(void*),
-		void(*)(void*,char*), void(*)(void*));
+		void(*)(void*,char*,size_t), void(*)(void*));
 
 /**
  *
