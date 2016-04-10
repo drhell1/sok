@@ -301,7 +301,7 @@ struct SSOK_Client * SSOK_Client_new(int cli_socket, void*(*cli_init)(void*),
 {
 	struct SSOK_Client *this = malloc(sizeof(*this));
 	this->sockfd = cli_socket;
-	this->data = cli_init(this);
+	this->data = cli_init?cli_init(this):this;
 	this->receive_callback = cli_receive_callback;
 	this->destroy_callback = cli_destroy;
 	return this;
