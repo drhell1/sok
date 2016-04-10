@@ -1,7 +1,7 @@
 /**
  *@file sok.h
  *@author José Monteiro
- *@author José Monteiro
+ *@author João Silva
  
  */
 

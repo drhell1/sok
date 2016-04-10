@@ -1,6 +1,6 @@
 #include <time.h>
 #include <stdio.h>
-#include "sok.h"
+#include "../sok.h"
 
 void received(void *ptr, char *buffer, size_t len)
 {

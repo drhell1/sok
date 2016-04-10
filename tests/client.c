@@ -1,6 +1,6 @@
 #include <time.h>
 #include <assert.h>
-#include "sok.h"
+#include "../sok.h"
 #include <stdio.h>
 
 void on_receive(void *data, char *buffer, size_t len)
