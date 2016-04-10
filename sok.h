@@ -1,3 +1,10 @@
+/**
+ *@file sok.h
+ *@author José Monteiro
+ *@author José Monteiro
+ 
+ */
+
 #ifndef SOCK_H
 #define SOCK_H
 #include <stddef.h>
