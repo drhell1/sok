@@ -8,8 +8,8 @@ go:
 	$(CC) -fPIC -g3 -ansi -std=c11 -c sok.c -o sok.o
 
 test: go
-	$(CC) -L. -lpthread sok.o server.c -o server -g3
-	$(CC) -L. -lpthread sok.o client.c -o client -g3
+	$(CC) -L. -lssl -lcrypto -lpthread sok.o server.c -o server -g3
+	$(CC) -L. -lssl -lcrypto -lpthread sok.o client.c -o client -g3
 
 install:
 	cp libsok.so /usr/lib

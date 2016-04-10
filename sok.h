@@ -16,6 +16,11 @@ SOK_Client * SOK_Client_new(char*, int, void(*)(void*,char*,size_t), void*);
 /**
  *
  */
+void SOK_Client_use_ssl(SOK_Client*);
+
+/**
+ *
+ */
 int SOK_Client_connect(SOK_Client*);
 
 /**
@@ -50,10 +55,16 @@ typedef struct SSOK_Server SSOK_Server;
  */
 SSOK_Server * SSOK_Server_new(int, void*(*)(void*), void(*)(void*,char*, size_t),
 		void(*)(void*));
+
 /**
  *
  */
 void SSOK_Server_destroy(SSOK_Server *);
+
+/**
+ *
+ */
+void SSOK_Server_set_ssl_certificate(SSOK_Server *, char *, char *);
 
 /**
  *
