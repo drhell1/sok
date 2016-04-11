@@ -14,14 +14,9 @@
 #include <sys/types.h>
 #include <unistd.h>
 
-/* Client */
+/* Common */
 
-enum SOK_ERROR
-{
-	EINIT=-1
-};
-
-void ShowCerts(SSL* ssl)
+static void SSL_show_cers(SSL* ssl)
 {
 	X509 *cert;
 	char *line;
@@ -41,6 +36,13 @@ void ShowCerts(SSL* ssl)
 	else
 		printf("No certificates.\n");
 }
+
+/* Client */
+
+enum SOK_ERROR
+{
+	EINIT=-1
+};
 
 typedef struct SOK_Client
 {
