@@ -26,8 +26,8 @@ void ShowCerts(SSL* ssl)
 	X509 *cert;
 	char *line;
 
-	cert = SSL_get_peer_certificate(ssl);	/* Get certificates (if available) */
-	if ( cert != NULL )
+	cert = SSL_get_peer_certificate(ssl);
+	if(cert != NULL)
 	{
 		printf("Server certificates:\n");
 		line = X509_NAME_oneline(X509_get_subject_name(cert), 0, 0);
@@ -62,7 +62,7 @@ static void SOK_Client_connect_socket(SOK_Client *this)
 	struct hostent *host;
 	struct sockaddr_in addr = {0};
 
-	if ( (host = gethostbyname(this->addr)) == NULL )
+	if((host = gethostbyname(this->addr)) == NULL)
 	{
 		perror(this->addr);
 		abort();
@@ -71,7 +71,7 @@ static void SOK_Client_connect_socket(SOK_Client *this)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(this->port);
 	addr.sin_addr.s_addr = *(long*)(host->h_addr_list[0]);
-	if ( connect(this->sockfd, (struct sockaddr*)&addr, sizeof(addr)) != 0 )
+	if(connect(this->sockfd, (struct sockaddr*)&addr, sizeof(addr)) != 0)
 	{
 		close(this->sockfd);
 		perror(this->addr);
@@ -87,12 +87,14 @@ static void SOK_Client_connect_socket(SOK_Client *this)
 
 static inline int SOK_Client_write(SOK_Client *this, void *buffer, size_t len)
 {
-	return this->use_ssl?SSL_write(this->ssl, buffer, len):write(this->sockfd, buffer, len);
+	return this->use_ssl ? SSL_write(this->ssl, buffer, len)
+			: write(this->sockfd, buffer, len);
 }
 
 static inline int SOK_Client_read(SOK_Client *this, void *buffer, size_t len)
 {
-	return this->use_ssl?SSL_read(this->ssl, buffer, len):read(this->sockfd, buffer, len);
+	return this->use_ssl ? SSL_read(this->ssl, buffer, len)
+			: read(this->sockfd, buffer, len);
 }
 
 void SOK_Client_send(void *data, char *buffer, size_t len)
@@ -115,13 +117,13 @@ static inline int SOK_Client_receive(SOK_Client *this)
 	if (n < 0)
 	{
 		/* TODO: add error cannot read from socket */
-		perror("cannot read from socket.\n");
+		perror("Cannot read from socket.\n");
 		return 0;
 	}
 	else if (n == 0)
 	{
 		/* TODO: add msg disconnected from server */
-		perror("disconnected from server.\n");
+		perror("Disconnected from server.\n");
 		return 0;
 	}
 	char *buffer = alloca(len);
@@ -168,11 +170,11 @@ static inline void SOK_Client_init_ssl_ctx(SOK_Client *this)
 {
 	const SSL_METHOD *method;
 	SSL_library_init();
-	OpenSSL_add_all_algorithms();		/* Load cryptos, et.al. */
-	SSL_load_error_strings();			/* Bring in and register error messages */
-	method = SSLv2_client_method();		/* Create new client-method instance */
-	this->ssl_ctx = SSL_CTX_new(method);			/* Create new context */
-	if ( this->ssl_ctx == NULL )
+	OpenSSL_add_all_algorithms();
+	SSL_load_error_strings();
+	method = SSLv2_client_method();
+	this->ssl_ctx = SSL_CTX_new(method);
+	if(this->ssl_ctx == NULL)
 	{
 		ERR_print_errors_fp(stderr);
 		abort();
@@ -286,12 +288,14 @@ static inline void SSOK_Server_add_client(SSOK_Server *this,
 
 static inline int SSOK_Client_read(struct SSOK_Client *this, void *ptr, size_t len)
 {
-	return this->ssl?SSL_read(this->ssl, ptr, len):read(this->sockfd, ptr, len);
+	return this->ssl ? SSL_read(this->ssl, ptr, len)
+			: read(this->sockfd, ptr, len);
 }
 
 static inline int SSOK_Client_write(struct SSOK_Client *this, void *ptr, size_t len)
 {
-	return this->ssl?SSL_write(this->ssl, ptr, len):write(this->sockfd, ptr, len);
+	return this->ssl ? SSL_write(this->ssl, ptr, len)
+			: write(this->sockfd, ptr, len);
 }
 
 void SSOK_Client_send(void *data, char *buffer, size_t len)
@@ -368,13 +372,13 @@ static inline int SSOK_Client_receive(struct SSOK_Client *this)
 	int n;
 	size_t len;
 	n = SSOK_Client_read(this, &len, sizeof(size_t));
-	if (n < 0)
+	if(n < 0)
 	{
 		/* TODO: add error */
 		SSOK_Client_destroy(this);
 		return 0;
 	}
-	else if (n == 0)
+	else if(n == 0)
 	{
 		SSOK_Client_destroy(this);
 		return 0;
@@ -413,12 +417,12 @@ static void SSOK_Server_bind(SSOK_Server *this)
 	addr.sin_family = AF_INET;
 	addr.sin_port = htons(this->port);
 	addr.sin_addr.s_addr = INADDR_ANY;
-	if ( bind(this->sockfd, (struct sockaddr*)&addr, sizeof(addr)) != 0 )
+	if(bind(this->sockfd, (struct sockaddr*)&addr, sizeof(addr)) != 0)
 	{
-		perror("can't bind port");
+		perror("Can't bind port");
 		abort();
 	}
-	if ( listen(this->sockfd, 10) != 0 )
+	if(listen(this->sockfd, 10) != 0)
 	{
 		perror("Can't configure listening port");
 		abort();
@@ -433,7 +437,7 @@ static inline void SSOK_Server_init_ssl_ctx(SSOK_Server *this)
 	SSL_load_error_strings();
 	method = SSLv2_server_method();
 	this->ssl_ctx = SSL_CTX_new(method);
-	if (this->ssl_ctx == NULL)
+	if(this->ssl_ctx == NULL)
 	{
 		ERR_print_errors_fp(stderr);
 		abort();
@@ -449,20 +453,22 @@ void SSOK_Server_set_ssl_certificate(SSOK_Server *this, char *cert, char *key)
 
 void SSOK_Server_load_certificates(SSOK_Server *this)
 {
-	if ( SSL_CTX_use_certificate_file(this->ssl_ctx, this->ssl_cert, SSL_FILETYPE_PEM) <= 0 )
+	if(SSL_CTX_use_certificate_file(this->ssl_ctx, this->ssl_cert,
+				SSL_FILETYPE_PEM) <= 0)
 	{
 		fprintf(stderr, "Cert file failed to load.\n");
 		ERR_print_errors_fp(stderr);
 		abort();
 	}
-	if ( SSL_CTX_use_PrivateKey_file(this->ssl_ctx, this->ssl_key, SSL_FILETYPE_PEM) <= 0 )
+	if(SSL_CTX_use_PrivateKey_file(this->ssl_ctx, this->ssl_key,
+				SSL_FILETYPE_PEM) <= 0)
 	{
 		fprintf(stderr, "Key file failed to load.\n");
 		ERR_print_errors_fp(stderr);
 		abort();
 	}
 	/* verify private key */
-	if ( !SSL_CTX_check_private_key(this->ssl_ctx) )
+	if(!SSL_CTX_check_private_key(this->ssl_ctx))
 	{
 		fprintf(stderr, "Private key does not match the public certificate\n");
 		abort();
