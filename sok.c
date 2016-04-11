@@ -172,7 +172,7 @@ static inline void SOK_Client_init_ssl_ctx(SOK_Client *this)
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
-	method = SSLv2_client_method();
+	method = TLSv1_2_client_method();
 	this->ssl_ctx = SSL_CTX_new(method);
 	if(this->ssl_ctx == NULL)
 	{
@@ -435,7 +435,7 @@ static inline void SSOK_Server_init_ssl_ctx(SSOK_Server *this)
 	SSL_library_init();
 	OpenSSL_add_all_algorithms();
 	SSL_load_error_strings();
-	method = SSLv2_server_method();
+	method = TLSv1_2_server_method();
 	this->ssl_ctx = SSL_CTX_new(method);
 	if(this->ssl_ctx == NULL)
 	{
