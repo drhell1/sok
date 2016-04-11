@@ -231,6 +231,9 @@ typedef struct SSOK_Server
 {
 	int sockfd;
 	int port;
+	int closing;
+
+	pthread_t thr;
 
 	char *ssl_cert;
 	char *ssl_key;
@@ -345,8 +348,10 @@ void SSOK_Server_destroy(SSOK_Server *this)
 		SSOK_Client_join(client);
 		SSOK_Client_destroy(client);
 	}
-	SSL_CTX_free(this->ssl_ctx);
+	this->closing = 1;
 	close(this->sockfd);
+	pthread_join(this->thr, NULL);
+	SSL_CTX_free(this->ssl_ctx);
 	free(this);
 }
 
@@ -477,15 +482,8 @@ void SSOK_Server_load_certificates(SSOK_Server *this)
 	}
 }
 
-void SSOK_Server_run(SSOK_Server *this)
+static void * SSOK_Server_main(SSOK_Server *this)
 {
-	if(this->ssl_cert)
-	{
-		SSOK_Server_init_ssl_ctx(this);
-		SSOK_Server_load_certificates(this);
-	}
-
-	SSOK_Server_bind(this);
 	while(1)
 	{
 		listen(this->sockfd, 5);
@@ -495,6 +493,10 @@ void SSOK_Server_run(SSOK_Server *this)
 				&cli_len);
 		if(cli_socket < 0)
 		{
+			if(this->closing)
+			{
+				return NULL;
+			}
 			/* TODO: add error */
 			continue;
 		}
@@ -523,6 +525,31 @@ void SSOK_Server_run(SSOK_Server *this)
 		{
 			/* TODO: add error */
 		}
+	}
+	return NULL;
+
+}
+
+void SSOK_Server_run(SSOK_Server *this, int async)
+{
+	if(this->ssl_cert)
+	{
+		SSOK_Server_init_ssl_ctx(this);
+		SSOK_Server_load_certificates(this);
+	}
+
+	this->closing = 0;
+
+	SSOK_Server_bind(this);
+
+	if(pthread_create(&this->thr, NULL, (void*(*)(void*))SSOK_Server_main,
+				(void*)this))
+	{
+		/* TODO: add error */
+	}
+	if(!async)
+	{
+		pthread_join(this->thr, NULL);
 	}
 }
 

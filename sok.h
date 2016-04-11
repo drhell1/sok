@@ -76,7 +76,7 @@ void SSOK_Server_set_ssl_certificate(SSOK_Server *, char *, char *);
 /**
  *
  */
-void SSOK_Server_run(SSOK_Server *);
+void SSOK_Server_run(SSOK_Server *, int);
 
 /**
  *
