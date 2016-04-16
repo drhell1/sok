@@ -44,6 +44,14 @@ enum SOK_ERROR
 	EINIT=-1
 };
 
+typedef struct
+{
+	unsigned int id;
+	pthread_mutex_t mutex;
+	char **bytes;
+	size_t *size;
+} SOK_request;
+
 typedef struct SOK_Client
 {
 	char *addr;
@@ -54,8 +62,11 @@ typedef struct SOK_Client
 	SSL_CTX *ssl_ctx;
 	int use_ssl;
 
+	SOK_request *requests;
+	unsigned int requests_num;
+
 	pthread_t listen_thread;
-	void(*cli_receive_callback)(void*,char*,size_t);
+	sok_request_cb cli_request_callback;
 	void *data;
 } SOK_Client;
 
@@ -87,7 +98,7 @@ static void SOK_Client_connect_socket(SOK_Client *this)
 	}
 }
 
-static inline int SOK_Client_write(SOK_Client *this, void *buffer, size_t len)
+static inline int SOK_Client_write(SOK_Client *this, const void *buffer, size_t len)
 {
 	return this->use_ssl ? SSL_write(this->ssl, buffer, len)
 			: write(this->sockfd, buffer, len);
@@ -99,11 +110,12 @@ static inline int SOK_Client_read(SOK_Client *this, void *buffer, size_t len)
 			: read(this->sockfd, buffer, len);
 }
 
-void SOK_Client_send(void *data, char *buffer, size_t len)
+void SOK_Client_send(SOK_Client *this, char *buffer, size_t len)
 {
-	SOK_Client *client = (SOK_Client*)data;
-	SOK_Client_write(client, &len, sizeof(size_t));
-	SOK_Client_write(client, buffer, len);
+	const char code = 'n';
+	SOK_Client_write(this, &code, sizeof(code));
+	SOK_Client_write(this, &len, sizeof(len));
+	SOK_Client_write(this, buffer, len);
 }
 
 void SOK_Client_use_ssl(SOK_Client *this)
@@ -111,11 +123,75 @@ void SOK_Client_use_ssl(SOK_Client *this)
 	this->use_ssl = 1;
 }
 
+char *SOK_Client_request(SOK_Client *this, char *buffer, size_t len,
+		size_t *result_len)
+{
+	int i, n = this->requests_num;
+	SOK_request *request = NULL;
+	char *result = NULL;
+
+	for(i = 0; i < n; i++)
+	{
+		if(this->requests[i].bytes == NULL)
+		{
+			request = &this->requests[i];
+		}
+	}
+	if(request == NULL)
+	{
+		this->requests = realloc(this->requests, sizeof(SOK_request) * n);
+		this->requests_num++;
+		request = &this->requests[n];
+	}
+	request->size = result_len;
+	request->bytes = &result;
+	request->id = n;
+	pthread_mutex_init(&request->mutex, NULL);
+	pthread_mutex_lock(&request->mutex);
+
+	const char code = 'R';
+	SOK_Client_write(this, &code, sizeof(code));
+	SOK_Client_write(this, &request->id, sizeof(request->id));
+	SOK_Client_write(this, &len, sizeof(len));
+	SOK_Client_write(this, buffer, len);
+
+	pthread_mutex_lock(&request->mutex);
+
+	request->bytes = NULL;
+	pthread_mutex_destroy(&request->mutex);
+
+	return result;
+}
+
+void SOK_Client_return_request(SOK_Client *this, unsigned int id, size_t len, char *buffer)
+{
+	int i = 0;
+	for(i = 0; i < this->requests_num; i++)
+	{
+		if(this->requests[i].id == id)
+		{
+			SOK_request *request = &this->requests[i];
+			if(request->size)
+			{
+				(*request->bytes) = malloc(len);
+				memcpy(*request->bytes, buffer, len);
+				*request->size = len;
+			}
+			pthread_mutex_unlock(&request->mutex);
+			return;
+		}
+	}
+
+}
+
 static inline int SOK_Client_receive(SOK_Client *this)
 {
 	int n;
 	size_t len;
-	n = SOK_Client_read(this, &len, sizeof(size_t));
+	char type;
+
+	n = SOK_Client_read(this, &type, sizeof(type));
+
 	if (n < 0)
 	{
 		/* TODO: add error cannot read from socket */
@@ -128,10 +204,49 @@ static inline int SOK_Client_receive(SOK_Client *this)
 		perror("Disconnected from server.\n");
 		return 0;
 	}
-	char *buffer = alloca(len);
-	n = SOK_Client_read(this, buffer, len);
-	/* TODO: add verification */
-	this->cli_receive_callback(this->data, buffer, len);
+
+	if(type == 'R') /* REQUEST */
+	{
+		size_t result_size;
+		unsigned int request_id;
+		SOK_Client_read(this, &request_id, sizeof(request_id));
+
+		SOK_Client_read(this, &len, sizeof(size_t));
+		char *buffer = alloca(len);
+		SOK_Client_read(this, buffer, len);
+
+		const char code = 'r';
+		char *result_buffer =
+			this->cli_request_callback(this->data, buffer, len, &result_size);
+
+		SOK_Client_write(this, &code, sizeof(code)); /* 'r' */
+		SOK_Client_write(this, &request_id, sizeof(request_id));
+		SOK_Client_write(this, &result_size, sizeof(result_size));
+		SOK_Client_write(this, result_buffer, result_size);
+	}
+	else if(type == 'r') /* REQUEST RETURN */
+	{
+		unsigned int request_id;
+
+		SOK_Client_read(this, &request_id, sizeof(request_id));
+
+		SOK_Client_read(this, &len, sizeof(size_t));
+		char *buffer = alloca(len);
+		SOK_Client_read(this, buffer, len);
+
+		SOK_Client_return_request(this, request_id, len, buffer);
+	}
+	else
+	{
+		size_t result_size;
+
+		SOK_Client_read(this, &len, sizeof(size_t));
+		char *buffer = alloca(len);
+		SOK_Client_read(this, buffer, len);
+
+		this->cli_request_callback(this->data, buffer, len, &result_size);
+	}
+
 	return 1;
 }
 
@@ -144,6 +259,17 @@ static void * SOK_Client_main(void *data)
 
 void SOK_Client_destroy(SOK_Client *this)
 {
+	unsigned int i;
+	for(i = 0; i < this->requests_num; i++)
+	{
+		SOK_request *request = &this->requests[i];
+		if(request->bytes)
+		{
+			/* fprinf(stderr, "Exiting with requests pending.\n"); */
+			exit(1);
+		}
+	}
+	free(this->requests);
 	close(this->sockfd);
 	SSL_free(this->ssl);
 	SSL_CTX_free(this->ssl_ctx);
@@ -151,7 +277,7 @@ void SOK_Client_destroy(SOK_Client *this)
 }
 
 SOK_Client * SOK_Client_new(char *addr, int port,
-		void(*cli_receive_callback)(void*,char*,size_t), void *data)
+		sok_request_cb cli_request_callback, void *data)
 {
 	SOK_Client *this = malloc(sizeof(SOK_Client));
 
@@ -159,7 +285,10 @@ SOK_Client * SOK_Client_new(char *addr, int port,
 	this->ssl = NULL;
 	this->ssl_ctx = NULL;
 
-	this->cli_receive_callback = cli_receive_callback;
+	this->requests = NULL;
+	this->requests_num = 0;
+
+	this->cli_request_callback = cli_request_callback;
 	this->data = data;
 
 	this->addr = addr;
@@ -202,7 +331,7 @@ int SOK_Client_connect(SOK_Client *this)
 	/* -------------------- */
 
 	/* Starting listen loop thread */
-	if(pthread_create(&this->listen_thread, NULL, SOK_Client_main,
+	if(pthread_create(&this->listen_thread, NULL, (sok_thread_cb)SOK_Client_main,
 			(void*)this))
 	{
 		/* TODO: add error */
@@ -240,9 +369,9 @@ typedef struct SSOK_Server
 	SSL_CTX *ssl_ctx;
 
 	/* Client Construction info */
-	void*(*cli_init)(void*);
-	void(*cli_receive_callback)(void*,char*,size_t);
-	void(*cli_destroy)(void*);
+	sok_cli_init_cb cli_init;
+	sok_request_cb cli_request_callback;
+	sok_cli_destroy_cb cli_destroy;
 	/* ------------------------ */
 
 	struct SSOK_Client **clients;
@@ -257,10 +386,13 @@ struct SSOK_Client
 
 	SSL *ssl;
 
+	unsigned int requests_num;
+	SOK_request *requests;
+
 	pthread_t thr;
 	void *data;
-	void(*receive_callback)(void*,char*,size_t);
-	void(*destroy_callback)(void*);
+	sok_request_cb request_callback;
+	sok_cli_destroy_cb destroy_callback;
 	SSOK_Server *server;
 };
 
@@ -297,7 +429,7 @@ static inline int SSOK_Client_read(struct SSOK_Client *this, void *ptr, size_t l
 			: read(this->sockfd, ptr, len);
 }
 
-static inline int SSOK_Client_write(struct SSOK_Client *this, void *ptr, size_t len)
+static inline int SSOK_Client_write(struct SSOK_Client *this, const void *ptr, size_t len)
 {
 	return this->ssl ? SSL_write(this->ssl, ptr, len)
 			: write(this->sockfd, ptr, len);
@@ -306,7 +438,9 @@ static inline int SSOK_Client_write(struct SSOK_Client *this, void *ptr, size_t 
 void SSOK_Client_send(void *data, char *buffer, size_t len)
 {
 	struct SSOK_Client *serv_cli = data;
-	SSOK_Client_write(serv_cli, &len, sizeof(size_t));
+	const char code = 'n';
+	SSOK_Client_write(serv_cli, &code, sizeof(code));
+	SSOK_Client_write(serv_cli, &len, sizeof(len));
 	SSOK_Client_write(serv_cli, buffer, len);
 }
 
@@ -374,11 +508,31 @@ void * SSOK_Client_get_server_data(const struct SSOK_Client *this)
 	return this->server;
 }
 
+void SSOK_Client_return_request(struct SSOK_Client *this, unsigned int id,
+		size_t len, char *buffer)
+{
+	int i = 0;
+	for(i = 0; i < this->requests_num; i++)
+	{
+		if(this->requests[i].id == id)
+		{
+			SOK_request *request = &this->requests[i];
+			memcpy(request->bytes, buffer, len);
+			*request->size = len;
+			pthread_mutex_unlock(&request->mutex);
+			return;
+		}
+	}
+
+}
+
 static inline int SSOK_Client_receive(struct SSOK_Client *this)
 {
 	int n;
 	size_t len;
-	n = SSOK_Client_read(this, &len, sizeof(size_t));
+	char type = '\0';
+
+	n = SSOK_Client_read(this, &type, sizeof(type));
 	if(n < 0)
 	{
 		/* TODO: add error */
@@ -390,10 +544,54 @@ static inline int SSOK_Client_receive(struct SSOK_Client *this)
 		SSOK_Client_destroy(this);
 		return 0;
 	}
-	char *buffer = alloca(len);
-	n = SSOK_Client_read(this, buffer, len);
-	/* TODO: add verification */
-	this->receive_callback(this->data, buffer, len);
+
+	if(type == 'R') /* REQUEST */
+	{
+		size_t result_size;
+		unsigned int request_id;
+		SSOK_Client_read(this, &request_id, sizeof(request_id));
+
+		SSOK_Client_read(this, &len, sizeof(size_t));
+		char *buffer = alloca(len);
+		SSOK_Client_read(this, buffer, len);
+
+		const char code = 'r';
+		char *result_buffer =
+			this->request_callback(this->data, buffer, len, &result_size);
+
+		SSOK_Client_write(this, &code, sizeof(code)); /* 'r' */
+		SSOK_Client_write(this, &request_id, sizeof(request_id));
+		SSOK_Client_write(this, &result_size, sizeof(result_size));
+		SSOK_Client_write(this, result_buffer, result_size);
+	}
+	else if(type == 'r') /* REQUEST RETURN */
+	{
+		unsigned int request_id;
+
+		SSOK_Client_read(this, &request_id, sizeof(request_id));
+
+		SSOK_Client_read(this, &len, sizeof(size_t));
+		char *buffer = alloca(len);
+		SSOK_Client_read(this, buffer, len);
+
+		SSOK_Client_return_request(this, request_id, len, buffer);
+	}
+	else if(type == 'n')
+	{
+		size_t result_size;
+
+		SSOK_Client_read(this, &len, sizeof(size_t));
+		char *buffer = alloca(len);
+		SSOK_Client_read(this, buffer, len);
+
+		this->request_callback(this->data, buffer, len, &result_size);
+	}
+	else
+	{
+		printf("Corrupted message.\n");
+		exit(1);
+	}
+
 	return 1;
 }
 
@@ -403,15 +601,16 @@ static void * SSOK_client_thread(void *data)
 	while(SSOK_Client_receive(serv_cli));
 }
 
-struct SSOK_Client * SSOK_Client_new(int cli_socket, void*(*cli_init)(void*),
-		void(*cli_receive_callback)(void*,char*,size_t),
-		void(*cli_destroy)(void*))
+struct SSOK_Client * SSOK_Client_new(int cli_socket, sok_cli_init_cb cli_init,
+		sok_request_cb cli_request_callback, sok_cli_destroy_cb cli_destroy)
 {
 	struct SSOK_Client *this = malloc(sizeof(*this));
 	this->ssl = NULL;
+	this->requests = NULL;
+	this->requests_num = 0;
 	this->sockfd = cli_socket;
 	this->data = cli_init?cli_init(this):this;
-	this->receive_callback = cli_receive_callback;
+	this->request_callback = cli_request_callback;
 	this->destroy_callback = cli_destroy;
 	return this;
 }
@@ -501,7 +700,7 @@ static void * SSOK_Server_main(SSOK_Server *this)
 			continue;
 		}
 		struct SSOK_Client *serv_cli = SSOK_Client_new(cli_socket,
-				this->cli_init, this->cli_receive_callback, this->cli_destroy);
+				this->cli_init, this->cli_request_callback, this->cli_destroy);
 
 		if(this->ssl_ctx)
 		{
@@ -542,7 +741,7 @@ void SSOK_Server_run(SSOK_Server *this, int async)
 
 	SSOK_Server_bind(this);
 
-	if(pthread_create(&this->thr, NULL, (void*(*)(void*))SSOK_Server_main,
+	if(pthread_create(&this->thr, NULL, (sok_thread_cb)SSOK_Server_main,
 				(void*)this))
 	{
 		/* TODO: add error */
@@ -553,8 +752,8 @@ void SSOK_Server_run(SSOK_Server *this, int async)
 	}
 }
 
-SSOK_Server * SSOK_Server_new(int port, void*(*cli_init)(void*),
-		void(*cli_receive_callback)(void*,char*,size_t), void(*cli_destroy)(void*))
+SSOK_Server * SSOK_Server_new(int port, sok_cli_init_cb cli_init,
+		sok_request_cb cli_request_callback, sok_cli_destroy_cb cli_destroy)
 {
 	SSOK_Server *this = malloc(sizeof(SSOK_Server));
 	this->clients = NULL; this->clients_num = 0;
@@ -565,7 +764,7 @@ SSOK_Server * SSOK_Server_new(int port, void*(*cli_init)(void*),
 	this->ssl_key = NULL;
 
 	this->cli_init = cli_init;
-	this->cli_receive_callback = cli_receive_callback;
+	this->cli_request_callback = cli_request_callback;
 	this->cli_destroy = cli_destroy;
 
 	return this;

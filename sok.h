@@ -14,11 +14,16 @@
 /***************/
 
 typedef struct SOK_Client SOK_Client;
+typedef void(*sok_message_cb)(void*,char*,size_t);
+typedef char*(*sok_request_cb)(void*,char*,size_t,size_t*);
+typedef void*(*sok_cli_init_cb)(void*);
+typedef void(*sok_cli_destroy_cb)(void*);
+typedef void*(*sok_thread_cb)(void*);
 
 /**
  *
  */
-SOK_Client * SOK_Client_new(char*, int, void(*)(void*,char*,size_t), void*);
+SOK_Client * SOK_Client_new(char*, int, sok_request_cb, void*);
 
 /**
  *
@@ -38,7 +43,12 @@ void SOK_Client_set_send_data(SOK_Client*, void *);
 /**
  *
  */
-void SOK_Client_send(void *, char *, size_t);
+char *SOK_Client_request(SOK_Client*, char *, size_t, size_t*);
+
+/**
+ *
+ */
+void SOK_Client_send(SOK_Client *, char *, size_t);
 
 /**
  *
@@ -60,8 +70,8 @@ typedef struct SSOK_Server SSOK_Server;
 /**
  *
  */
-SSOK_Server * SSOK_Server_new(int, void*(*)(void*), void(*)(void*,char*, size_t),
-		void(*)(void*));
+SSOK_Server * SSOK_Server_new(int, sok_cli_init_cb, sok_request_cb,
+		sok_cli_destroy_cb);
 
 /**
  *
@@ -86,8 +96,14 @@ void SSOK_Server_broadcast(SSOK_Server*, char*, size_t, struct SSOK_Client*);
 /**
 *
 */
-struct SSOK_Client * SSOK_Client_new(int , void*(*)(void*),
-		void(*)(void*,char*,size_t), void(*)(void*));
+struct SSOK_Client * SSOK_Client_new(int , sok_cli_init_cb, sok_request_cb,
+		sok_cli_destroy_cb);
+
+/**
+ *
+ */
+char *SSOK_Client_request(void *, char *, size_t, size_t*);
+
 
 /**
  *
