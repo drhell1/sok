@@ -1,7 +1,7 @@
 CC = cc
 
 all:
-	$(CC) -O2 -ansi -std=c11 -c ../sok.c -o sok.o
+	$(CC) -g3 -ansi -std=c11 -c ../sok.c -o sok.o
 	$(CC) -lssl -lcrypto -lpthread sok.o server.c -o server -g3
 	$(CC) -lssl -lcrypto -lpthread sok.o client.c -o client -g3
 
