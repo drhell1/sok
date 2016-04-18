@@ -44,6 +44,15 @@ enum SOK_ERROR
 	EINIT=-1
 };
 
+
+typedef struct
+{
+	char *buffer;
+	size_t len;
+	unsigned int request_id;
+	SOK_Client *client;
+} CallbackInfo;
+
 typedef struct
 {
 	unsigned int id;
@@ -68,6 +77,7 @@ typedef struct SOK_Client
 	pthread_t listen_thread;
 	sok_request_cb cli_request_callback;
 	void *data;
+	int request_async;
 } SOK_Client;
 
 static void SOK_Client_connect_socket(SOK_Client *this)
@@ -184,6 +194,54 @@ void SOK_Client_return_request(SOK_Client *this, unsigned int id, size_t len, ch
 
 }
 
+static void *CallbackInfo_call(CallbackInfo *this)
+{
+	size_t result_size = 0;
+	SOK_Client *client = this->client;
+
+	if(this->request_id == -1)
+	{
+		client->cli_request_callback(client->data, this->buffer, this->len,
+				&result_size);
+	}
+	else
+	{
+		const char code = 'r';
+
+		char *result_buffer = client->cli_request_callback(client->data,
+				this->buffer, this->len, &result_size);
+
+		SOK_Client_write(client, &code, sizeof(code)); /* 'r' */
+		SOK_Client_write(client, &this->request_id,
+				sizeof(this->request_id));
+		SOK_Client_write(client, &result_size, sizeof(result_size));
+		SOK_Client_write(client, result_buffer, result_size);
+	}
+
+	free(this->buffer);
+	free(this);
+}
+
+void SOK_Client_call_callback(SOK_Client *this, char *buf, size_t len,
+		unsigned int req)
+{
+	CallbackInfo *cbi = malloc(sizeof(*cbi));
+	cbi->buffer = buf;
+	cbi->len = len;
+	cbi->request_id = req;
+	cbi->client = this;
+
+	if(this->request_async)
+	{
+		pthread_t thr;
+		pthread_create(&thr, NULL, (sok_thread_cb)CallbackInfo_call, cbi);
+	}
+	else
+	{
+		CallbackInfo_call(cbi);
+	}
+}
+
 static inline int SOK_Client_receive(SOK_Client *this)
 {
 	int n;
@@ -212,17 +270,11 @@ static inline int SOK_Client_receive(SOK_Client *this)
 		SOK_Client_read(this, &request_id, sizeof(request_id));
 
 		SOK_Client_read(this, &len, sizeof(size_t));
-		char *buffer = alloca(len);
+		char *buffer = malloc(len);
 		SOK_Client_read(this, buffer, len);
 
-		const char code = 'r';
-		char *result_buffer =
-			this->cli_request_callback(this->data, buffer, len, &result_size);
+		SOK_Client_call_callback(this, buffer, len, request_id);
 
-		SOK_Client_write(this, &code, sizeof(code)); /* 'r' */
-		SOK_Client_write(this, &request_id, sizeof(request_id));
-		SOK_Client_write(this, &result_size, sizeof(result_size));
-		SOK_Client_write(this, result_buffer, result_size);
 	}
 	else if(type == 'r') /* REQUEST RETURN */
 	{
@@ -244,6 +296,7 @@ static inline int SOK_Client_receive(SOK_Client *this)
 		char *buffer = alloca(len);
 		SOK_Client_read(this, buffer, len);
 
+		SOK_Client_call_callback(this, buffer, len, -1);
 		this->cli_request_callback(this->data, buffer, len, &result_size);
 	}
 
@@ -277,7 +330,7 @@ void SOK_Client_destroy(SOK_Client *this)
 }
 
 SOK_Client * SOK_Client_new(char *addr, int port,
-		sok_request_cb cli_request_callback, void *data)
+		sok_request_cb cli_request_callback, void *data, int async)
 {
 	SOK_Client *this = malloc(sizeof(SOK_Client));
 
@@ -290,6 +343,7 @@ SOK_Client * SOK_Client_new(char *addr, int port,
 
 	this->cli_request_callback = cli_request_callback;
 	this->data = data;
+	this->request_async = async;
 
 	this->addr = addr;
 	this->port = port;

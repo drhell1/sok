@@ -23,7 +23,7 @@ typedef void*(*sok_thread_cb)(void*);
 /**
  *
  */
-SOK_Client * SOK_Client_new(char*, int, sok_request_cb, void*);
+SOK_Client * SOK_Client_new(char*, int, sok_request_cb, void*, int);
 
 /**
  *

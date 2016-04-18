@@ -13,7 +13,7 @@ char *on_receive(void *data, char *buffer, size_t len, size_t *res_size)
 
 int main(int argc, char **argv)
 {
-	SOK_Client *sok_client = SOK_Client_new("127.0.0.1", 5001, on_receive, NULL);
+	SOK_Client *sok_client = SOK_Client_new("127.0.0.1", 5001, on_receive, NULL, 1);
 
 	/* SOK_Client_use_ssl(sok_client); */
 
