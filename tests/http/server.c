@@ -1,13 +1,21 @@
 #include <time.h>
 #include <stdio.h>
 #include <string.h>
-#include "../sok.h"
+#include "../../sok.h"
+
+void *init(void *sok)
+{
+	printf("new connection\n");
+}
+
+void destroy(void *ptr)
+{
+	printf("connection ended\n");
+}
 
 char *received(void *ptr, char *buffer, size_t len, size_t *res_size)
 {
-	printf("received from client: %s\n", buffer);
-
-	char response[] = "response";
+	char response[] = "kek";
 	*res_size = sizeof(response);
 	return strdup(response);
 }
