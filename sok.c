@@ -494,7 +494,8 @@ void SSOK_Client_send_http(SSOK_Client *this, char *buffer, size_t len)
 	char time_buffer[500];
 	time_t now = time(0);
 	struct tm tm = *gmtime(&now);
-	strftime(time_buffer, sizeof(time_buffer), "%a, %d %b %Y %H:%M:%S %Z", &tm);
+	size_t time_size = strftime(time_buffer, sizeof(time_buffer),
+			"%a, %d %b %Y %H:%M:%S %Z", &tm);
 
 	const char format[] = "HTTP/1.1 200 OK\n"
 		"Date: %s\n"
@@ -506,7 +507,7 @@ void SSOK_Client_send_http(SSOK_Client *this, char *buffer, size_t len)
 		"\n";
 	char *format_result = alloca(
 		sizeof(format) +
-		200 /* size of time */ +
+		time_size /* size of time */ +
 		16 /* size of length chars */
 	);
 	size_t len2 = sprintf(format_result, format, time_buffer, len);
