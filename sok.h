@@ -69,7 +69,7 @@ void SOK_Client_wait(SOK_Client *);
 /* Server Side */
 /***************/
 
-struct SSOK_Client;
+typedef struct SSOK_Client SSOK_Client;
 typedef struct SSOK_Server SSOK_Server;
 
 /**
@@ -96,12 +96,12 @@ void SSOK_Server_run(SSOK_Server *, int);
 /**
  *
  */
-void SSOK_Server_broadcast(SSOK_Server*, char*, size_t, struct SSOK_Client*);
+void SSOK_Server_broadcast(SSOK_Server*, char*, size_t, SSOK_Client*);
 
 /**
 *
 */
-struct SSOK_Client * SSOK_Client_new(int , sok_cli_init_cb, sok_request_cb,
+SSOK_Client * SSOK_Client_new(int , sok_cli_init_cb, sok_request_cb,
 		sok_cli_destroy_cb);
 
 /**
@@ -113,11 +113,11 @@ char *SSOK_Client_request(void *, char *, size_t, size_t*);
 /**
  *
  */
-void SSOK_Client_send(void *, char *, size_t);
+void SSOK_Client_send(SSOK_Client *, char *, size_t);
 
 /**
  *
  */
-void * SSOK_Client_get_server_data(const struct SSOK_Client*);
+void * SSOK_Client_get_server_data(const SSOK_Client*);
 
 #endif /* SOCK_H */
