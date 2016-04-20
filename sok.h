@@ -2,7 +2,12 @@
  *@file sok.h
  *@author José Monteiro
  *@author João Silva
-
+ *@date 12 Apr 2016
+ *
+ * @brief Sok - Sockets Wrapper
+ *
+ * Sok is a wrapper to server and client socket communication, including ssl
+ * protocol
  */
 
 #ifndef SOCK_H
