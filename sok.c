@@ -39,13 +39,14 @@ static void SSL_show_cers(SSL* ssl)
 		printf("No certificates.\n");
 }
 
-/* Client */
+/***************/
+/* Client Side */
+/***************/
 
 enum SOK_ERROR
 {
 	EINIT=-1
 };
-
 
 typedef struct
 {
@@ -408,7 +409,9 @@ void SOK_Client_wait(SOK_Client *this)
 	pthread_join(this->listen_thread, NULL);
 }
 
-/* Server */
+/***************/
+/* Server Side */
+/***************/
 
 typedef struct SSOK_Server
 {

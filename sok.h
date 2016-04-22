@@ -48,7 +48,7 @@ void SOK_Client_set_send_data(SOK_Client*, void *);
 /**
  *
  */
-char *SOK_Client_request(SOK_Client*, char *, size_t, size_t*);
+char * SOK_Client_request(SOK_Client*, char *, size_t, size_t*);
 
 /**
  *
@@ -107,7 +107,7 @@ SSOK_Client * SSOK_Client_new(int , sok_cli_init_cb, sok_request_cb,
 /**
  *
  */
-char *SSOK_Client_request(void *, char *, size_t, size_t*);
+char * SSOK_Client_request(void *, char *, size_t, size_t*);
 
 
 /**
