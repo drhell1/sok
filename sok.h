@@ -34,7 +34,7 @@ typedef void*(*sok_thread_cb)(void*);
  * @param cli_request_callback Function pointer to be called whenever the
  * server sends a request to the client.
  * @param data Pointer set by the programmer to be passed as an argument
- * to the receive callback.
+ * to the received callback.
  * @param async Defines if the requests are to block the program or run in a
  * separate thread.
  * @return Pointer to the new SOK_Client.
@@ -57,7 +57,7 @@ int SOK_Client_connect(SOK_Client *this);
 
 /**
  * @brief Overrides the pointer to be passed as an argument to the
- * receive callback.
+ * received callback.
  * @param this Pointer to SOK_Client instance.
  */
 void SOK_Client_set_send_data(SOK_Client *this, void *data);
